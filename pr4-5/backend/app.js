@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { nanoid } = require('nanoid');
+const bcrypt = require('bcrypt');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -8,221 +9,234 @@ const app = express();
 const port = 3000;
 
 app.use(express.json());
-
 app.use(cors({
   origin: 'http://localhost:3001',
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Logging middleware
 app.use((req, res, next) => {
   res.on('finish', () => {
     console.log(`[${new Date().toISOString()}] [${req.method}] ${res.statusCode} ${req.path}`);
-    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-      console.log('Body:', req.body);
-    }
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) console.log('Body:', req.body);
   });
   next();
 });
 
-let products = [
+// ── Pre-seeded users (пароли захешированы bcrypt) ─────────────────────────────
+// ivan@mail.ru      → password123
+// maria@mail.ru     → securePass
+// admin@softshop.ru → admin2025
+let users = [
   {
-    id: nanoid(1), name: 'Adobe Photoshop 2025', category: 'Графика и дизайн',
-    description: 'Профессиональный редактор растровой графики. Ретушь, монтаж, создание иллюстраций и веб-графики.',
-    price: 3990, stock: 999, rating: 4.8,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Photoshop'
+    id: nanoid(6),
+    email: 'ivan@mail.ru',
+    first_name: 'Иван',
+    last_name: 'Петров',
+    hashedPassword: '$2b$10$N26J0xwiqcUpPz6gvRvPp.rkiPi1COZ5Bt7IcTjKw/1CYxnA4E6jW',
   },
   {
-    id: nanoid(6), name: 'Microsoft Office 2024', category: 'Офис и продуктивность',
-    description: 'Пакет офисных приложений: Word, Excel, PowerPoint, Outlook. Лицензия на 1 ПК.',
-    price: 6990, stock: 500, rating: 4.6,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=MS+Office'
+    id: nanoid(6),
+    email: 'maria@mail.ru',
+    first_name: 'Мария',
+    last_name: 'Сидорова',
+    hashedPassword: '$2b$10$pOAHYpuU8AqIoXuMsVoI5.xQdm9SENpXgr7sMYI8s5IUhBEAasgmm',
   },
   {
-    id: nanoid(6), name: 'JetBrains All Products Pack', category: 'Разработка',
-    description: 'Подписка на все IDE JetBrains: IntelliJ IDEA, WebStorm, PyCharm, GoLand и другие.',
-    price: 24990, stock: 200, rating: 4.9,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=JetBrains'
-  },
-  {
-    id: nanoid(6), name: 'Kaspersky Total Security', category: 'Безопасность',
-    description: 'Комплексная защита от вирусов, шифровальщиков, фишинга. 3 устройства, 1 год.',
-    price: 2490, stock: 300, rating: 4.5,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Kaspersky'
-  },
-  {
-    id: nanoid(6), name: 'Vegas Pro 21', category: 'Видеомонтаж',
-    description: 'Профессиональный нелинейный видеоредактор с поддержкой 8K, HDR и GPU-ускорением.',
-    price: 14990, stock: 80, rating: 4.4,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Vegas+Pro'
-  },
-  {
-    id: nanoid(6), name: 'Notion Business', category: 'Офис и продуктивность',
-    description: 'Единое рабочее пространство: заметки, задачи, базы данных, вики. Подписка на 1 год.',
-    price: 4990, stock: 999, rating: 4.7,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Notion'
-  },
-  {
-    id: nanoid(6), name: 'Blender Studio', category: 'Графика и дизайн',
-    description: '3D-редактор и пакет для анимации. Подписка на облачные активы Blender Studio.',
-    price: 990, stock: 999, rating: 4.8,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Blender'
-  },
-  {
-    id: nanoid(6), name: 'GitHub Copilot', category: 'Разработка',
-    description: 'AI-ассистент для программирования. Автодополнение кода, генерация тестов, code review.',
-    price: 1990, stock: 999, rating: 4.7,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Copilot'
-  },
-  {
-    id: nanoid(6), name: 'Acronis Cyber Protect', category: 'Безопасность',
-    description: 'Резервное копирование и киберзащита. 1 ТБ облачного хранилища, 5 устройств.',
-    price: 3490, stock: 150, rating: 4.3,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Acronis'
-  },
-  {
-    id: nanoid(6), name: 'DaVinci Resolve Studio', category: 'Видеомонтаж',
-    description: 'Профессиональный монтаж, цветокоррекция, VFX и аудиопостпродакшн в одном пакете.',
-    price: 29900, stock: 60, rating: 4.9,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=DaVinci'
-  },
-  {
-    id: nanoid(6), name: 'Figma Professional', category: 'Графика и дизайн',
-    description: 'Инструмент для UI/UX-дизайна и прототипирования. Совместная работа в реальном времени.',
-    price: 5990, stock: 999, rating: 4.8,
-    image: 'https://placehold.co/300x180/0f172a/6366f1?text=Figma'
+    id: nanoid(6),
+    email: 'admin@softshop.ru',
+    first_name: 'Администратор',
+    last_name: 'SoftShop',
+    hashedPassword: '$2b$10$9gFw6Gx.6xD1GPQoxqAf/.oBM57mTacdcjTfQTjoTSAC3dMG9o.7W',
   },
 ];
 
-// ── Swagger config ───────────────────────────────────────────────────────────
+// ── Products ──────────────────────────────────────────────────────────────────
+let products = [
+  { id: nanoid(6), title: 'Adobe Photoshop 2025',        category: 'Графика и дизайн', description: 'Профессиональный редактор растровой графики',         price: 3990  },
+  { id: nanoid(6), title: 'Microsoft Office 2024',       category: 'Офис',             description: 'Word, Excel, PowerPoint, Outlook. Лицензия на 1 ПК', price: 6990  },
+  { id: nanoid(6), title: 'JetBrains All Products Pack', category: 'Разработка',       description: 'Подписка на все IDE JetBrains',                      price: 24990 },
+  { id: nanoid(6), title: 'Kaspersky Total Security',    category: 'Безопасность',     description: 'Защита от вирусов и шифровальщиков, 3 устройства',   price: 2490  },
+  { id: nanoid(6), title: 'Vegas Pro 21',                category: 'Видеомонтаж',      description: 'Нелинейный видеоредактор с поддержкой 8K и HDR',      price: 14990 },
+  { id: nanoid(6), title: 'Notion Business',             category: 'Офис',             description: 'Заметки, задачи, базы данных. Подписка на 1 год',     price: 4990  },
+  { id: nanoid(6), title: 'GitHub Copilot',              category: 'Разработка',       description: 'AI-ассистент для программирования',                  price: 1990  },
+  { id: nanoid(6), title: 'DaVinci Resolve Studio',      category: 'Видеомонтаж',      description: 'Монтаж, цветокоррекция, VFX и аудиопостпродакшн',     price: 29900 },
+  { id: nanoid(6), title: 'Figma Professional',          category: 'Графика и дизайн', description: 'UI/UX-дизайн и прототипирование в реальном времени',  price: 5990  },
+  { id: nanoid(6), title: 'Acronis Cyber Protect',       category: 'Безопасность',     description: '1 ТБ облачного хранилища, резервное копирование',     price: 3490  },
+];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function findProductOr404(id, res) {
+  const product = products.find(p => p.id === id);
+  if (!product) { res.status(404).json({ error: 'Product not found' }); return null; }
+  return product;
+}
+
+// ── Swagger ───────────────────────────────────────────────────────────────────
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'API интернет-магазина ПО',
+      title: 'SoftShop API',
       version: '1.0.0',
-      description: 'REST API для управления каталогом программного обеспечения',
+      description: 'API авторизации и управления товарами (ПО)',
     },
-    servers: [
-      {
-        url: `http://localhost:${port}`,
-        description: 'Локальный сервер',
-      },
-    ],
+    servers: [{ url: `http://localhost:${port}`, description: 'Локальный сервер' }],
   },
   apis: ['./app.js'],
 };
-
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// ── Swagger schemas ──────────────────────────────────────────────────────────
 /**
  * @swagger
  * components:
  *   schemas:
- *     Product:
+ *     User:
  *       type: object
- *       required:
- *         - name
- *         - category
- *         - description
- *         - price
- *         - stock
  *       properties:
  *         id:
  *           type: string
- *           description: Автоматически сгенерированный уникальный ID товара
- *         name:
+ *         email:
  *           type: string
- *           description: Название программного продукта
- *         category:
+ *         first_name:
  *           type: string
- *           description: Категория продукта
- *           enum: [Разработка, Графика и дизайн, Видеомонтаж, Офис и продуктивность, Безопасность, Образование, Другое]
- *         description:
+ *         last_name:
  *           type: string
- *           description: Описание продукта
- *         price:
- *           type: number
- *           description: Цена в рублях за год
- *         stock:
- *           type: integer
- *           description: Количество доступных лицензий
- *         rating:
- *           type: number
- *           nullable: true
- *           minimum: 0
- *           maximum: 5
- *           description: Рейтинг продукта от 0 до 5
- *         image:
- *           type: string
- *           nullable: true
- *           description: URL изображения продукта
  *       example:
  *         id: "abc123"
- *         name: "Adobe Photoshop 2025"
+ *         email: "ivan@mail.ru"
+ *         first_name: "Иван"
+ *         last_name: "Петров"
+ *     LoginInput:
+ *       type: object
+ *       required: [email, password]
+ *       properties:
+ *         email:
+ *           type: string
+ *           example: ivan@mail.ru
+ *         password:
+ *           type: string
+ *           example: password123
+ *     Product:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         title:
+ *           type: string
+ *         category:
+ *           type: string
+ *         description:
+ *           type: string
+ *         price:
+ *           type: number
+ *       example:
+ *         id: "xyz789"
+ *         title: "Adobe Photoshop 2025"
  *         category: "Графика и дизайн"
  *         description: "Профессиональный редактор растровой графики"
  *         price: 3990
- *         stock: 999
- *         rating: 4.8
- *         image: "https://example.com/photoshop.png"
  *     ProductInput:
  *       type: object
- *       required:
- *         - name
- *         - category
- *         - description
- *         - price
- *         - stock
+ *       required: [title, category, description, price]
  *       properties:
- *         name:
+ *         title:
  *           type: string
+ *           example: Figma Professional
  *         category:
  *           type: string
+ *           example: Дизайн
  *         description:
  *           type: string
+ *           example: Инструмент для UI/UX-дизайна
  *         price:
  *           type: number
- *         stock:
- *           type: integer
- *         rating:
- *           type: number
- *           nullable: true
- *         image:
- *           type: string
- *           nullable: true
+ *           example: 5990
  *     Error:
  *       type: object
  *       properties:
  *         error:
  *           type: string
- *           description: Сообщение об ошибке
  */
 
-// ── Helper ───────────────────────────────────────────────────────────────────
-function findProductOr404(id, res) {
-  const product = products.find(p => p.id === id);
-  if (!product) {
-    res.status(404).json({ error: 'Product not found' });
-    return null;
-  }
-  return product;
-}
+// ── AUTH ──────────────────────────────────────────────────────────────────────
 
-// ── Routes ───────────────────────────────────────────────────────────────────
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Вход в систему
+ *     description: |
+ *       Тестовые аккаунты:
+ *       - ivan@mail.ru / password123
+ *       - maria@mail.ru / securePass
+ *       - admin@softshop.ru / admin2025
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginInput'
+ *     responses:
+ *       200:
+ *         description: Успешная авторизация
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 login:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Отсутствуют обязательные поля
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Неверный пароль
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Пользователь не найден
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email and password are required' });
+  }
+  const user = users.find(u => u.email === email.trim().toLowerCase());
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const ok = await bcrypt.compare(password, user.hashedPassword);
+  if (!ok) return res.status(401).json({ error: 'Invalid password' });
+
+  const { hashedPassword, ...safeUser } = user;
+  res.json({ login: true, user: safeUser });
+});
+
+// ── PRODUCTS ──────────────────────────────────────────────────────────────────
 
 /**
  * @swagger
  * /api/products:
  *   get:
- *     summary: Возвращает список всех продуктов
+ *     summary: Получить список всех товаров
  *     tags: [Products]
  *     responses:
  *       200:
- *         description: Список всех программных продуктов
+ *         description: Список товаров
  *         content:
  *           application/json:
  *             schema:
@@ -238,18 +252,17 @@ app.get('/api/products', (req, res) => {
  * @swagger
  * /api/products/{id}:
  *   get:
- *     summary: Получает продукт по ID
+ *     summary: Получить товар по ID
  *     tags: [Products]
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         required: true
- *         description: ID продукта
  *     responses:
  *       200:
- *         description: Данные продукта
+ *         description: Данные товара
  *         content:
  *           application/json:
  *             schema:
@@ -271,7 +284,7 @@ app.get('/api/products/:id', (req, res) => {
  * @swagger
  * /api/products:
  *   post:
- *     summary: Создаёт новый программный продукт
+ *     summary: Создать новый товар
  *     tags: [Products]
  *     requestBody:
  *       required: true
@@ -281,7 +294,7 @@ app.get('/api/products/:id', (req, res) => {
  *             $ref: '#/components/schemas/ProductInput'
  *     responses:
  *       201:
- *         description: Продукт успешно создан
+ *         description: Товар успешно создан
  *         content:
  *           application/json:
  *             schema:
@@ -294,19 +307,16 @@ app.get('/api/products/:id', (req, res) => {
  *               $ref: '#/components/schemas/Error'
  */
 app.post('/api/products', (req, res) => {
-  const { name, category, description, price, stock, rating, image } = req.body;
-  if (!name || !category || !description || price === undefined || stock === undefined) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  const { title, category, description, price } = req.body;
+  if (!title || !category || !description || price === undefined) {
+    return res.status(400).json({ error: 'title, category, description and price are required' });
   }
   const newProduct = {
     id: nanoid(6),
-    name: name.trim(),
+    title: title.trim(),
     category: category.trim(),
     description: description.trim(),
     price: Number(price),
-    stock: Number(stock),
-    rating: rating != null ? Number(rating) : null,
-    image: image || null,
   };
   products.push(newProduct);
   res.status(201).json(newProduct);
@@ -315,52 +325,28 @@ app.post('/api/products', (req, res) => {
 /**
  * @swagger
  * /api/products/{id}:
- *   patch:
- *     summary: Обновляет данные продукта
+ *   put:
+ *     summary: Обновить параметры товара
  *     tags: [Products]
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         required: true
- *         description: ID продукта
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               category:
- *                 type: string
- *               description:
- *                 type: string
- *               price:
- *                 type: number
- *               stock:
- *                 type: integer
- *               rating:
- *                 type: number
- *                 nullable: true
- *               image:
- *                 type: string
- *                 nullable: true
+ *             $ref: '#/components/schemas/ProductInput'
  *     responses:
  *       200:
- *         description: Обновлённый продукт
+ *         description: Обновлённый товар
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Product'
- *       400:
- *         description: Нет данных для обновления
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
  *       404:
  *         description: Товар не найден
  *         content:
@@ -368,24 +354,14 @@ app.post('/api/products', (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.patch('/api/products/:id', (req, res) => {
+app.put('/api/products/:id', (req, res) => {
   const product = findProductOr404(req.params.id, res);
   if (!product) return;
-
-  const fields = ['name', 'category', 'description', 'price', 'stock', 'rating', 'image'];
-  if (!fields.some(f => req.body[f] !== undefined)) {
-    return res.status(400).json({ error: 'Nothing to update' });
-  }
-
-  const { name, category, description, price, stock, rating, image } = req.body;
-  if (name !== undefined) product.name = name.trim();
+  const { title, category, description, price } = req.body;
+  if (title !== undefined) product.title = title.trim();
   if (category !== undefined) product.category = category.trim();
   if (description !== undefined) product.description = description.trim();
   if (price !== undefined) product.price = Number(price);
-  if (stock !== undefined) product.stock = Number(stock);
-  if (rating !== undefined) product.rating = Number(rating);
-  if (image !== undefined) product.image = image;
-
   res.json(product);
 });
 
@@ -393,18 +369,17 @@ app.patch('/api/products/:id', (req, res) => {
  * @swagger
  * /api/products/{id}:
  *   delete:
- *     summary: Удаляет продукт
+ *     summary: Удалить товар
  *     tags: [Products]
  *     parameters:
  *       - in: path
  *         name: id
+ *         required: true
  *         schema:
  *           type: string
- *         required: true
- *         description: ID продукта
  *     responses:
  *       204:
- *         description: Продукт успешно удалён (нет тела ответа)
+ *         description: Товар успешно удалён
  *       404:
  *         description: Товар не найден
  *         content:
@@ -419,12 +394,7 @@ app.delete('/api/products/:id', (req, res) => {
   res.status(204).send();
 });
 
-// 404 fallback
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-
-// Global error handler
+app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
@@ -432,5 +402,5 @@ app.use((err, req, res, next) => {
 
 app.listen(port, () => {
   console.log(`Сервер запущен на http://localhost:${port}`);
-  console.log(`Swagger UI доступен по адресу http://localhost:${port}/api-docs`);
+  console.log(`Swagger UI: http://localhost:${port}/api-docs`);
 });
