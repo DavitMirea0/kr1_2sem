@@ -16,17 +16,19 @@ function Stars({ rating }) {
 
 export default function ProductItem({ product, onEdit, onDelete }) {
   const isFree = product.price === 0;
+  const name   = product.title || product.name || '—';
+
   return (
     <div className="card">
       <div className="card__img">
         {product.image
-          ? <img src={product.image} alt={product.name} />
+          ? <img src={product.image} alt={name} />
           : <div className="card__imgPlaceholder">💿</div>
         }
         <span className="card__category">{product.category}</span>
       </div>
       <div className="card__body">
-        <div className="card__name">{product.name}</div>
+        <div className="card__name">{name}</div>
         <div className="card__desc">{product.description}</div>
         <Stars rating={product.rating} />
         <div className="card__footer">
@@ -38,10 +40,13 @@ export default function ProductItem({ product, onEdit, onDelete }) {
               {product.stock > 0 ? `${product.stock} лиц.` : 'Нет'}
             </span>
           </div>
-          <div className="card__actions">
-            <button className="btn" onClick={() => onEdit(product)}>✏ Изменить</button>
-            <button className="btn btn--danger" onClick={() => onDelete(product.id)}>✕ Удалить</button>
-          </div>
+
+          {(onEdit || onDelete) && (
+            <div className="card__actions">
+              {onEdit   && <button className="btn"            onClick={() => onEdit(product)}>✎ Изменить</button>}
+              {onDelete && <button className="btn btn--danger" onClick={() => onDelete(product.id)}>✕ Удалить</button>}
+            </div>
+          )}
         </div>
       </div>
     </div>
